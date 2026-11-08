@@ -24,7 +24,9 @@ public sealed class AppSettings
 
     public ReminderSettings Reminders { get; set; } = new();
 
-    public string? EnvironmentUrl { get; set; }
+    public const string DefaultEnvironmentUrl = "https://bizaid.crm4.dynamics.com";
+
+    public string? EnvironmentUrl { get; set; } = DefaultEnvironmentUrl;
 
     /// <summary>Fills in anything a hand-edited or older file left out.</summary>
     public void Normalize()
@@ -33,6 +35,7 @@ public sealed class AppSettings
         Hotkey ??= HotkeySetting.Default;
         Reminders ??= new ReminderSettings();
         Reminders.Normalize();
+        if (string.IsNullOrWhiteSpace(EnvironmentUrl)) EnvironmentUrl = DefaultEnvironmentUrl;
 
         var days = WorkHours ?? new List<WorkDay>();
         WorkHours = Enum.GetValues<DayOfWeek>()

@@ -1,0 +1,18 @@
+<Window x:Class="TimeKeeper.Views.SignInWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Time Keeper – התחברות ל-Dynamics"
+        Width="520" Height="680"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
+        FontFamily="{StaticResource UiFont}" FontSize="14"
+        Background="{DynamicResource WindowBrush}"
+        Icon="pack://application:,,,/Assets/TimeKeeper.ico">
+    <DockPanel>
+        <TextBlock DockPanel.Dock="Top" FlowDirection="RightToLeft" Margin="16,12" TextWrapping="Wrap"
+                   Style="{StaticResource Caption}" FontSize="14"
+                   Text="התחבר עם חשבון העבודה שלך. החלון ייסגר לבד כשההתחברות תסתיים." />
+        <!-- The WebView2 controller is drawn over this area (positioned in code). -->
+        <Border x:Name="WebHost" Background="{DynamicResource WindowBrush}" />
+    </DockPanel>
+</Window>

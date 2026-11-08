@@ -152,8 +152,14 @@
                              Text="{Binding EnvironmentUrl, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                     <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,12"
                                Text="לדוגמה: https://bizaid.crm4.dynamics.com" />
-                    <TextBlock Style="{StaticResource Caption}"
-                               Text="התחברות והצגת המשתמש המחובר יתווספו בשלב הבא." />
+                    <TextBlock Text="משתמש מחובר" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <TextBlock x:Name="AccountName" Margin="0,0,0,2" />
+                    <TextBlock x:Name="AccountDetail" Style="{StaticResource Caption}" Margin="0,0,0,12"
+                               AutomationProperties.LiveSetting="Polite" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="SignInButton" Content="התחבר" Margin="0,0,8,0" />
+                        <Button x:Name="SignOutButton" Content="התנתק" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

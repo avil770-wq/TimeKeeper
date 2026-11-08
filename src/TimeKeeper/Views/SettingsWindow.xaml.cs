@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using TimeKeeper.Models;
 using TimeKeeper.Services;
+using TimeKeeper.Services.Dataverse;
 
 namespace TimeKeeper.Views;
 
@@ -11,12 +12,21 @@ public partial class SettingsWindow : Window
 
     private readonly SettingsService _settings;
     private readonly HotkeyService _hotkeys;
+    private readonly DataverseSession _session;
 
-    public SettingsWindow(SettingsService settings, HotkeyService hotkeys, ThemeService theme, Action resetPosition)
+    public SettingsWindow(SettingsService settings, HotkeyService hotkeys, ThemeService theme, Action resetPosition,
+        DataverseSession session, Func<Task> signIn)
     {
         InitializeComponent();
         _settings = settings;
         _hotkeys = hotkeys;
+        _session = session;
+
+        _session.StateChanged += OnSessionChanged;
+        Closed += (_, _) => _session.StateChanged -= OnSessionChanged;
+        SignInButton.Click += async (_, _) => await signIn();
+        SignOutButton.Click += async (_, _) => await _session.SignOutAsync();
+        UpdateAccount();
 
         var vm = new SettingsViewModel(settings);
         vm.ThemeChanged += (_, _) => theme.Apply(settings.Current.Theme);
@@ -29,6 +39,23 @@ public partial class SettingsWindow : Window
         ResetPositionButton.Click += (_, _) => resetPosition();
 
         Closed += (_, _) => _settings.Flush();
+    }
+
+    private void OnSessionChanged(object? sender, EventArgs e) => Dispatcher.Invoke(UpdateAccount);
+
+    private void UpdateAccount()
+    {
+        var signedIn = _session.IsSignedIn;
+        AccountName.Text = signedIn ? _session.UserName ?? string.Empty : "לא מחובר";
+        AccountDetail.Text = _session.State switch
+        {
+            SessionState.SignedIn => _session.UserEmail ?? string.Empty,
+            SessionState.SigningIn => "מתחבר…",
+            _ => _session.Error ?? string.Empty,
+        };
+        SignInButton.Visibility = signedIn ? Visibility.Collapsed : Visibility.Visible;
+        SignInButton.IsEnabled = _session.State != SessionState.SigningIn;
+        SignOutButton.Visibility = signedIn ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>Shown on startup if the saved combo was already taken.</summary>

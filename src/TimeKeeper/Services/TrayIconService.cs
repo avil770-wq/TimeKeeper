@@ -44,6 +44,9 @@ public sealed class TrayIconService : IDisposable
     public void SetCornerHidden(bool hidden) =>
         _toggleItem.Text = hidden ? "הצג את הפינה" : "הסתר את הפינה";
 
+    public void ShowBalloon(string title, string text) =>
+        _icon.ShowBalloonTip(5000, title, text, Forms.ToolTipIcon.Info);
+
     public void SetTooltip(string text) => _icon.Text = text.Length > 63 ? text[..63] : text;
 
     public void Dispose()

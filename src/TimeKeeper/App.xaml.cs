@@ -4,6 +4,7 @@ using System.Windows.Threading;
 using Microsoft.Win32;
 using TimeKeeper.Models;
 using TimeKeeper.Services;
+using TimeKeeper.Services.Dataverse;
 using TimeKeeper.Views;
 
 namespace TimeKeeper;
@@ -20,6 +21,8 @@ public partial class App : Application
     private CornerWindow _corner = null!;
     private SettingsWindow? _settingsWindow;
     private TimerMenuWindow? _timerMenu;
+    private DataverseSession _session = null!;
+    private DataverseService _data = null!;
     private bool _cornerHidden;
     private bool _hotkeyTakenAtStartup;
 
@@ -72,12 +75,28 @@ public partial class App : Application
         }
 
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+
+        _session = new DataverseSession();
+        _data = new DataverseService(_session);
+        _session.StateChanged += (_, _) => _tray.SetTooltip(SessionTooltip());
+        _ = SignInAsync(interactive: false); // silent; the menu offers a button if it needs the user
     }
+
+    private Task SignInAsync(bool interactive) =>
+        _session.SignInAsync(_settings.Current.EnvironmentUrl ?? AppSettings.DefaultEnvironmentUrl, interactive);
+
+    private string SessionTooltip() => _session.State switch
+    {
+        SessionState.SignedIn => $"Time Keeper – {_session.UserName}",
+        SessionState.SigningIn => "Time Keeper – מתחבר…",
+        _ => "Time Keeper – לא מחובר",
+    };
 
     protected override void OnExit(ExitEventArgs e)
     {
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _settings?.Flush();
+        _session?.Dispose();
         _hotkeys?.Dispose();
         _tray?.Dispose();
         _theme?.Dispose();
@@ -88,8 +107,7 @@ public partial class App : Application
 
     /// <summary>
     /// Corner click, tray left-click and the hotkey all land here.
-    /// For now it opens the placeholder menu; later: no timer → menu,
-    /// timer running → stop dialog.
+    /// For now it opens the menu; later: timer running → stop dialog.
     /// </summary>
     private void OnPrimaryAction()
     {
@@ -99,8 +117,13 @@ public partial class App : Application
             return;
         }
 
-        _timerMenu = new TimerMenuWindow();
+        _timerMenu = new TimerMenuWindow(_session, _data, () => SignInAsync(interactive: true));
         _timerMenu.Closed += (_, _) => _timerMenu = null;
+        _timerMenu.TaskChosen += (_, pick) =>
+        {
+            Log.Info($"Task chosen: {pick.Client.Name} / {pick.Project.Name} / {pick.Task.Display}");
+            _tray.ShowBalloon("נבחרה משימה", $"{pick.Task.Display}\n{pick.Project.Name} · {pick.Client.Name}\nהטיימר עצמו יגיע בשלב הבא.");
+        };
         _timerMenu.Show();
 
         var screen = CornerPositioner.ResolveScreen(_settings.Current.Placement, out _);
@@ -187,7 +210,8 @@ public partial class App : Application
             return;
         }
 
-        _settingsWindow = new SettingsWindow(_settings, _hotkeys, _theme, ResetPosition);
+        _settingsWindow = new SettingsWindow(_settings, _hotkeys, _theme, ResetPosition, _session,
+            () => SignInAsync(interactive: true));
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         if (_hotkeyTakenAtStartup && _hotkeys.Current is null) _settingsWindow.ShowHotkeyTaken();
         _settingsWindow.Show();

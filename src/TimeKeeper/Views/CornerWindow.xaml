@@ -1,0 +1,41 @@
+<Window x:Class="TimeKeeper.Views.CornerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Time Keeper"
+        Width="64" Height="64"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
+        ShowActivated="False" FocusVisualStyle="{x:Null}"
+        AutomationProperties.Name="Time Keeper – התחל טיימר"
+        AutomationProperties.HelpText="קליק פותח את תפריט הטיימר. גרירה מזיזה לפינה אחרת. קליק ימני להגדרות.">
+
+    <!-- Quarter circle anchored to the window's outer corner. Transparent
+         pixels are click-through, so only the visible quarter is interactive. -->
+    <Canvas x:Name="Root" ClipToBounds="True" Width="64" Height="64">
+        <!-- Outer white hairline so the corner reads on any wallpaper. -->
+        <Path x:Name="OuterLine" Stroke="{StaticResource CornerOuterLineBrush}" StrokeThickness="3"
+              Fill="{StaticResource CornerIdleBrush}">
+            <Path.Data>
+                <EllipseGeometry x:Name="OuterShape" RadiusX="14" RadiusY="14" Center="64,64" />
+            </Path.Data>
+        </Path>
+        <Path x:Name="Quarter" Stroke="{StaticResource CornerInnerLineBrush}" StrokeThickness="1"
+              Fill="{StaticResource CornerIdleBrush}" Cursor="Hand">
+            <Path.Data>
+                <EllipseGeometry x:Name="Shape" RadiusX="14" RadiusY="14" Center="64,64" />
+            </Path.Data>
+        </Path>
+
+        <!-- Stopwatch icon (same geometry as the prototype). -->
+        <Viewbox x:Name="CornerIcon" Width="24" Height="24" Opacity="0" IsHitTestVisible="False"
+                 Canvas.Left="28" Canvas.Top="28">
+            <Canvas Width="24" Height="24">
+                <Ellipse Canvas.Left="4" Canvas.Top="5" Width="16" Height="16"
+                         Stroke="{StaticResource CornerIconBrush}" StrokeThickness="2" />
+                <Path Data="M12 9v4l2.5 2M9.5 2.5h5" Stroke="{StaticResource CornerIconBrush}"
+                      StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      StrokeLineJoin="Round" />
+            </Canvas>
+        </Viewbox>
+    </Canvas>
+</Window>

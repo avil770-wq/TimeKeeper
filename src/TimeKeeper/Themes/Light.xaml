@@ -1,0 +1,19 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Light palette, taken from the HTML prototype (index.html). -->
+    <SolidColorBrush x:Key="WindowBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="BarBrush" Color="#F1F4F7" />
+    <SolidColorBrush x:Key="DeskBrush" Color="#DCE3EA" />
+    <SolidColorBrush x:Key="TextBrush" Color="#17283D" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#4A5B70" />
+    <SolidColorBrush x:Key="LineBrush" Color="#D3DBE3" />
+    <SolidColorBrush x:Key="FieldBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="FieldLineBrush" Color="#7F8FA3" />
+    <SolidColorBrush x:Key="FocusBrush" Color="#0077A8" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#EEF3F7" />
+    <SolidColorBrush x:Key="ActiveBrush" Color="#D9F1FC" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#B42318" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#00AAED" />
+    <SolidColorBrush x:Key="AccentTextBrush" Color="#17283D" />
+</ResourceDictionary>

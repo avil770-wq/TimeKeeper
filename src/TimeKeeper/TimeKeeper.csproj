@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TimeKeeper</RootNamespace>
+    <AssemblyName>TimeKeeper</AssemblyName>
+    <ApplicationIcon>Assets\TimeKeeper.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.1.0</Version>
+    <Company>Landau Solutions</Company>
+    <Product>Time Keeper</Product>
+    <!-- WFAC010: WinForms DPI hint; DPI is set in app.manifest for WPF, which is correct here. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+  </PropertyGroup>
+
+  <!-- WinForms is only here for NotifyIcon / Screen. Keep its namespaces out of
+       the implicit usings so they don't clash with WPF types. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\TimeKeeper.ico" />
+  </ItemGroup>
+
+</Project>

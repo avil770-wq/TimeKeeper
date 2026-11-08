@@ -207,7 +207,7 @@ public partial class TimerMenuWindow : Window
         Columns.Visibility = Visibility.Collapsed;
         SignInPanel.Visibility = Visibility.Visible;
         SignInText.Text = string.IsNullOrEmpty(reason)
-            ? "צריך להתחבר ל-Dynamics כדי לראות לקוחות ומשימות."
+            ? "כדי לראות לקוחות ומשימות צריך להתחבר."
             : reason;
         SignInButton.Focus();
     }

@@ -2,13 +2,21 @@ using System.Text.Json;
 
 namespace TimeKeeper.Services.Dataverse;
 
-public sealed record Client(Guid Id, string Name, DateTime? LastReported);
+public sealed record Client(Guid Id, string Name, DateTime? LastReported)
+{
+    public override string ToString() => Name;
+}
 
-public sealed record Project(Guid Id, string Name, DateTime? LastReported);
+public sealed record Project(Guid Id, string Name, DateTime? LastReported)
+{
+    public override string ToString() => Name;
+}
 
 public sealed record WorkTask(Guid Id, string Title, string? Number, DateTime? LastReported)
 {
-    public string Display => string.IsNullOrEmpty(Number) ? Title : $"{Title} · {Number}";
+    public string Display => string.IsNullOrEmpty(Number) ? Title : $"{Title} ({Number})";
+
+    public override string ToString() => Display;
 }
 
 /// <summary>

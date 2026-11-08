@@ -103,13 +103,16 @@ public sealed class DataverseSession : IDisposable
             // 2. Load the app root: Windows SSO usually signs in with no UI.
             _appLoaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             _web!.Navigate(env.ToString());
-            var silent = await Task.WhenAny(_appLoaded.Task, Task.Delay(TimeSpan.FromSeconds(20)));
+            // Silent SSO usually finishes in a few seconds; when the user asked to
+            // sign in, show the window quickly instead of making them wait.
+            var silentWait = interactive ? TimeSpan.FromSeconds(4) : TimeSpan.FromSeconds(20);
+            var silent = await Task.WhenAny(_appLoaded.Task, Task.Delay(silentWait));
 
             if (silent != _appLoaded.Task)
             {
                 if (!interactive)
                 {
-                    SetState(SessionState.NeedsUser, "צריך להתחבר ל-Dynamics.");
+                    SetState(SessionState.NeedsUser, "כדי לראות לקוחות ומשימות צריך להתחבר.");
                     return;
                 }
 
@@ -236,7 +239,8 @@ public sealed class DataverseSession : IDisposable
             var dataFolder = Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
                 "TimeKeeper", "WebView2");
-            var environment = await CoreWebView2Environment.CreateAsync(null, dataFolder);
+            var options = new CoreWebView2EnvironmentOptions { Language = "he-IL" };
+            var environment = await CoreWebView2Environment.CreateAsync(null, dataFolder, options);
 
             _window = new SignInWindow();
             var hwnd = new WindowInteropHelper(_window).EnsureHandle();

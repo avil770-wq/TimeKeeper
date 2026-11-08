@@ -19,6 +19,13 @@
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
   </PropertyGroup>
 
+  <!-- Debug runs through dotnet.exe (Microsoft-signed) instead of a freshly built,
+       unsigned TimeKeeper.exe. Org policies that block new/unknown executables
+       (Defender ASR, Smart App Control) then don't stop every F5. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+
   <!-- WinForms is only here for NotifyIcon / Screen. Keep its namespaces out of
        the implicit usings so they don't clash with WPF types. -->
   <ItemGroup>

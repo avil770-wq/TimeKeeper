@@ -23,6 +23,11 @@ public partial class App : Application
     private TimerMenuWindow? _timerMenu;
     private DataverseSession _session = null!;
     private DataverseService _data = null!;
+    private TimerService _timer = null!;
+    private ReportQueue _queue = null!;
+    private StopDialog? _stopDialog;
+    private DispatcherTimer? _retryTimer;
+    private bool _flushing;
     private bool _cornerHidden;
     private bool _hotkeyTakenAtStartup;
 
@@ -76,10 +81,112 @@ public partial class App : Application
 
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
+        _timer = new TimerService();
+        _timer.Load();
+        _timer.Changed += (_, _) => RefreshStatus();
+        _queue = new ReportQueue();
+        _queue.Load();
+        _queue.Changed += (_, _) => RefreshStatus();
+
         _session = new DataverseSession();
         _data = new DataverseService(_session);
-        _session.StateChanged += (_, _) => _tray.SetTooltip(SessionTooltip());
+        _session.StateChanged += (_, _) =>
+        {
+            RefreshStatus();
+            if (_session.IsSignedIn) _ = FlushQueueAsync();
+        };
+
+        // Retry pending reports every few minutes (network back, server back).
+        _retryTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
+        _retryTimer.Tick += (_, _) => _ = FlushQueueAsync();
+        _retryTimer.Start();
+
+        RefreshStatus();
         _ = SignInAsync(interactive: false); // silent; the menu offers a button if it needs the user
+    }
+
+    /// <summary>Corner colour and tray tooltip from timer + queue + session.</summary>
+    private void RefreshStatus()
+    {
+        if (_timer.Current is { } run)
+        {
+            _corner.SetState(CornerState.Running);
+            _tray.SetTooltip($"רץ: {run.Target.TaskTitle}");
+        }
+        else if (_queue.Count > 0)
+        {
+            _corner.SetState(CornerState.Pending);
+            _tray.SetTooltip(_queue.Count == 1 ? "דיווח אחד ממתין לשליחה" : $"{_queue.Count} דיווחים ממתינים לשליחה");
+        }
+        else
+        {
+            _corner.SetState(CornerState.Idle);
+            _tray.SetTooltip(SessionTooltip());
+        }
+    }
+
+    private async Task<(SaveOutcome, string?)> SaveReportAsync(HoursReport report)
+    {
+        try
+        {
+            if (!_session.IsSignedIn) throw new InvalidOperationException("Not signed in.");
+            await _data.CreateHoursAsync(report);
+            _timer.Clear();
+            _tray.ShowBalloon("הדיווח נשמר", $"{report.Minutes} דק׳ · {report.Target.TaskTitle}");
+            return (SaveOutcome.Saved, null);
+        }
+        catch (Exception ex) when (DataverseService.IsTransient(ex))
+        {
+            Log.Warn($"Report {report.LocalId} queued: {ex.Message}");
+            _queue.Enqueue(report with { LastError = ex.Message });
+            _timer.Clear();
+            _tray.ShowBalloon("הדיווח נשמר במחשב", "אין חיבור כרגע. הדיווח יישלח כשהחיבור יחזור.");
+            return (SaveOutcome.Queued, null);
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Report {report.LocalId} rejected.", ex);
+            return (SaveOutcome.Failed, "Dynamics דחה את הדיווח. הפרטים ביומן.");
+        }
+    }
+
+    private async Task FlushQueueAsync()
+    {
+        if (_flushing || _queue.Count == 0 || !_session.IsSignedIn) return;
+        _flushing = true;
+        var sent = 0;
+        try
+        {
+            foreach (var report in _queue.Items.ToList())
+            {
+                try
+                {
+                    await _data.CreateHoursAsync(report);
+                    _queue.Remove(report.LocalId);
+                    sent++;
+                }
+                catch (Exception ex) when (DataverseService.IsTransient(ex))
+                {
+                    Log.Warn($"Still can't send {report.LocalId}: {ex.Message}");
+                    break; // try the rest next round
+                }
+                catch (Exception ex)
+                {
+                    // Won't succeed on retry; keep it so nothing is lost, and say so in the log.
+                    Log.Error($"Queued report {report.LocalId} rejected by Dataverse; keeping it.", ex);
+                    _queue.Enqueue(report with { LastError = ex.Message });
+                }
+            }
+        }
+        finally
+        {
+            _flushing = false;
+        }
+
+        if (sent > 0)
+        {
+            _tray.ShowBalloon("החיבור חזר", sent == 1 ? "הדיווח נשלח." : $"{sent} דיווחים נשלחו.");
+        }
     }
 
     private Task SignInAsync(bool interactive) =>
@@ -96,6 +203,7 @@ public partial class App : Application
     {
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _settings?.Flush();
+        _retryTimer?.Stop();
         _session?.Dispose();
         _hotkeys?.Dispose();
         _tray?.Dispose();
@@ -106,11 +214,17 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Corner click, tray left-click and the hotkey all land here.
-    /// For now it opens the menu; later: timer running → stop dialog.
+    /// Corner click, tray left-click and the hotkey all land here:
+    /// no timer → the task menu, timer running → the stop dialog.
     /// </summary>
     private void OnPrimaryAction()
     {
+        if (_timer.Current is { } run)
+        {
+            ShowStopDialog(run);
+            return;
+        }
+
         if (_timerMenu is not null)
         {
             _timerMenu.Activate();
@@ -121,14 +235,35 @@ public partial class App : Application
         _timerMenu.Closed += (_, _) => _timerMenu = null;
         _timerMenu.TaskChosen += (_, pick) =>
         {
-            Log.Info($"Task chosen: {pick.Client.Name} / {pick.Project.Name} / {pick.Task.Display}");
-            _tray.ShowBalloon("נבחרה משימה", $"{pick.Task.Display}\n{pick.Project.Name} · {pick.Client.Name}\nהטיימר עצמו יגיע בשלב הבא.");
+            _timer.Start(TimerTarget.From(pick.Client, pick.Project, pick.Task));
+            _tray.ShowBalloon("הטיימר התחיל", $"{pick.Task.Title}\n{pick.Project.Name} · {pick.Client.Name}");
         };
         _timerMenu.Show();
 
         var screen = CornerPositioner.ResolveScreen(_settings.Current.Placement, out _);
         CornerPositioner.Place(_timerMenu, _settings.Current.Placement.Corner, screen);
         _timerMenu.Activate();
+    }
+
+    private void ShowStopDialog(RunningTimer run)
+    {
+        if (_stopDialog is not null)
+        {
+            _stopDialog.Activate();
+            return;
+        }
+
+        _stopDialog = new StopDialog(run, SaveReportAsync, () =>
+        {
+            Log.Info($"Timer deleted: {run.Target.TaskTitle}, started {run.StartedAt:t}.");
+            _timer.Clear();
+        });
+        _stopDialog.Closed += (_, _) => _stopDialog = null;
+        _stopDialog.Show();
+
+        var screen = CornerPositioner.ResolveScreen(_settings.Current.Placement, out _);
+        CornerPositioner.Place(_stopDialog, _settings.Current.Placement.Corner, screen);
+        _stopDialog.Activate();
     }
 
     private void PlaceCorner()
@@ -222,6 +357,7 @@ public partial class App : Application
     {
         _settingsWindow?.Close();
         _timerMenu?.Close();
+        _stopDialog?.Close();
         Shutdown();
     }
 

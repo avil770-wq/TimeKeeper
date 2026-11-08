@@ -31,6 +31,7 @@ public sealed class DataverseService
     private readonly DataverseSession _session;
     private string? _hoursSet;
     private string? _projectSet;
+    private Dictionary<string, string>? _hoursNav;
 
     public DataverseService(DataverseSession session)
     {
@@ -91,6 +92,69 @@ public sealed class DataverseService
             .OrderByDescending(t => t.LastReported.HasValue)
             .ThenByDescending(t => t.LastReported)
             .ToList();
+    }
+
+    /// <summary>Write one report to new_hours. Throws DataverseException on server errors.</summary>
+    public async Task CreateHoursAsync(HoursReport report, CancellationToken ct = default)
+    {
+        var set = await HoursSetAsync(ct);
+        var projectSet = await ProjectSetAsync(ct);
+        var nav = await HoursNavigationAsync(ct);
+        var userId = _session.UserId;
+        if (userId == Guid.Empty) throw new InvalidOperationException("No signed-in user.");
+
+        var body = new System.Text.Json.Nodes.JsonObject
+        {
+            ["new_name"] = report.Description,
+            ["new_dur_rep"] = report.Minutes,
+            ["new_date"] = report.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            [nav["new_cust_name"] + "@odata.bind"] = $"/accounts({report.Target.ClientId})",
+            [nav["new_project"] + "@odata.bind"] = $"/{projectSet}({report.Target.ProjectId})",
+            [nav["new_case"] + "@odata.bind"] = $"/incidents({report.Target.TaskId})",
+            [nav["new_reportedby"] + "@odata.bind"] = $"/systemusers({userId})",
+        };
+
+        var (status, text) = await _session.SendAsync("POST", set, body.ToJsonString(), ct);
+        if (status == 401) throw new DataverseException(status, text);
+        if (status is < 200 or >= 300) throw new DataverseException(status, text);
+        Log.Info($"Saved report {report.LocalId}: {report.Minutes} min on {report.Target.TaskTitle}.");
+    }
+
+    /// <summary>
+    /// Offline / signed out / server trouble → keep in the queue and retry.
+    /// A 4xx validation error won't fix itself, so it goes back to the user.
+    /// </summary>
+    public static bool IsTransient(Exception ex) => ex switch
+    {
+        DataverseException d => d.Status is 0 or 401 or 408 or 429 or >= 500,
+        InvalidOperationException or TimeoutException or TaskCanceledException => true,
+        _ => false,
+    };
+
+    /// <summary>Lookup attribute → navigation property name, for @odata.bind (case matters).</summary>
+    private async Task<Dictionary<string, string>> HoursNavigationAsync(CancellationToken ct)
+    {
+        if (_hoursNav is not null) return _hoursNav;
+        using var doc = await _session.GetAsync(
+            "EntityDefinitions(LogicalName='new_hours')/ManyToOneRelationships?$select=ReferencingAttribute,ReferencingEntityNavigationPropertyName,ReferencedEntity", ct);
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in Values(doc))
+        {
+            var attr = Str(r, "ReferencingAttribute");
+            var navName = Str(r, "ReferencingEntityNavigationPropertyName");
+            var target = Str(r, "ReferencedEntity");
+            // Customer-type lookups have one relationship per target; we want account.
+            if (attr == "new_cust_name" && target != "account") continue;
+            map.TryAdd(attr, navName);
+        }
+
+        foreach (var needed in new[] { "new_cust_name", "new_project", "new_case", "new_reportedby" })
+        {
+            if (!map.ContainsKey(needed)) throw new NotSupportedException($"new_hours has no relationship for {needed}.");
+        }
+
+        Log.Info("new_hours navigation: " + string.Join(", ", map.Where(kv => kv.Key.StartsWith("new_")).Select(kv => $"{kv.Key}→{kv.Value}")));
+        return _hoursNav = map;
     }
 
     private sealed record RecentRow(Guid Id, string Name, DateTime? Last);
